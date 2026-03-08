@@ -268,42 +268,44 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             stats = {}
 
-        # 3. Fetch listings to compute median and highest price (requires DISCOGS_TOKEN)
-        highest_price = None
-        median_price = None
+        # 3. Fetch price suggestions by condition (requires DISCOGS_TOKEN)
+        # Returns Low (cheapest condition) / Median (VG+) / High (NM) from sales history
+        price_suggestions = {}
         listings_error = None if DISCOGS_TOKEN else "no_token"
         if DISCOGS_TOKEN:
-            listings_url = (
-                f"https://api.discogs.com/marketplace/search"
-                f"?release_id={release_id}&status=For+Sale&per_page=100&sort=price&sort_order=asc"
-            )
+            suggestions_url = f"https://api.discogs.com/marketplace/price_suggestions/{release_id}"
             try:
-                req3 = urllib.request.Request(listings_url, headers=discogs_headers)
+                req3 = urllib.request.Request(suggestions_url, headers=discogs_headers)
                 with urllib.request.urlopen(req3, timeout=10) as resp:
-                    listings_data = json.loads(resp.read())
-                # Check for API error message
-                if "message" in listings_data:
-                    listings_error = listings_data["message"]
-                else:
-                    raw_listings = listings_data.get("listings", listings_data.get("results", []))
-                    prices = []
-                    for l in raw_listings:
-                        p = l.get("price")
-                        if isinstance(p, dict) and p.get("value") is not None:
-                            prices.append(float(p["value"]))
-                        elif isinstance(p, (int, float)):
-                            prices.append(float(p))
-                    if prices:
-                        currency = stats.get("lowest_price", {}).get("currency", "USD") if stats.get("lowest_price") else "USD"
-                        highest_price = {"value": max(prices), "currency": currency}
-                        s = sorted(prices)
-                        n = len(s)
-                        mid = (s[n // 2 - 1] + s[n // 2]) / 2 if n % 2 == 0 else s[n // 2]
-                        median_price = {"value": round(mid, 2), "currency": currency}
+                    price_suggestions = json.loads(resp.read())
+                if "message" in price_suggestions:
+                    listings_error = price_suggestions["message"]
+                    price_suggestions = {}
             except urllib.error.HTTPError as e:
                 listings_error = f"HTTP {e.code}: {e.read().decode()[:100]}"
             except Exception as e:
                 listings_error = str(e)[:100]
+
+        # Extract Low/Median/High from condition-based suggestions
+        highest_price = None
+        median_price = None
+        currency = stats.get("lowest_price", {}).get("currency", "USD") if isinstance(stats.get("lowest_price"), dict) else "USD"
+        if price_suggestions:
+            condition_order = [
+                "Poor (P)", "Fair (F)", "Good (G)", "Good Plus (G+)",
+                "Very Good (VG)", "Very Good Plus (VG+)", "Near Mint (NM or M-)", "Mint (M)"
+            ]
+            values = []
+            for cond in condition_order:
+                v = price_suggestions.get(cond, {}).get("value")
+                if v is not None:
+                    values.append(float(v))
+            if values:
+                highest_price = {"value": max(values), "currency": currency}
+                s = sorted(values)
+                n = len(s)
+                mid = (s[n // 2 - 1] + s[n // 2]) / 2 if n % 2 == 0 else s[n // 2]
+                median_price = {"value": round(mid, 2), "currency": currency}
 
         # 4. Fetch community stats (have/want/rating)
         community = {}
