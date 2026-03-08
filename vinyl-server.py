@@ -224,11 +224,18 @@ class Handler(BaseHTTPRequestHandler):
 
         artist = payload.get("artist", "")
         title = payload.get("title", "")
-        query = urllib.parse.quote(f"{artist} {title}".strip())
+        barcode = payload.get("barcode", "")
+        catno = payload.get("catno", "")
         ua = "VinylRecognizer/1.0"
 
-        # 1. Search Discogs for the release
-        search_url = f"https://api.discogs.com/database/search?q={query}&type=release&per_page=3"
+        # 1. Search Discogs — prefer barcode > catno > text query
+        if barcode:
+            search_url = f"https://api.discogs.com/database/search?barcode={urllib.parse.quote(barcode)}&type=release&per_page=3"
+        elif catno:
+            search_url = f"https://api.discogs.com/database/search?catno={urllib.parse.quote(catno)}&type=release&per_page=3"
+        else:
+            query = urllib.parse.quote(f"{artist} {title}".strip())
+            search_url = f"https://api.discogs.com/database/search?q={query}&type=release&per_page=3"
         try:
             req = urllib.request.Request(search_url, headers={"User-Agent": ua})
             with urllib.request.urlopen(req, timeout=8) as resp:
@@ -280,11 +287,17 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass  # listings endpoint may require auth; silently skip
 
+        label_list = release.get("label", [])
+        format_list = release.get("format", [])
         self._json_response({
             "found": True,
             "release_id": release_id,
             "release_title": release.get("title", ""),
             "year": release.get("year", ""),
+            "country": release.get("country", ""),
+            "label": label_list[0] if label_list else "",
+            "catno": release.get("catno", ""),
+            "format": ", ".join(format_list) if format_list else "",
             "lowest_price": stats.get("lowest_price"),
             "highest_price": highest_price,
             "avg_price": avg_price,

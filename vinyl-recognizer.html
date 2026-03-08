@@ -474,6 +474,73 @@
       margin-top: 8px;
     }
 
+    /* Scan modes */
+    .scan-modes {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 8px 4px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+
+    .mode-btn:hover { border-color: var(--accent); color: var(--text); }
+    .mode-btn.active { background: rgba(168,85,247,0.12); border-color: var(--accent); color: var(--text); }
+
+    .mode-hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .pressing-details {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .pressing-details strong { color: var(--text); }
+
+    .barcode-result {
+      text-align: center;
+      padding: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+
+    .barcode-number {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--text);
+      font-family: monospace;
+    }
+
+    .barcode-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
     /* Login */
     #login-screen {
       position: fixed;
@@ -697,7 +764,23 @@
 
 <!-- Image input -->
 <div class="card">
-  <div class="card-title">Album Photo</div>
+  <div class="card-title">Scan Mode</div>
+
+  <div class="scan-modes">
+    <button class="mode-btn active" id="modeCover" onclick="setMode('cover')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Cover Art
+    </button>
+    <button class="mode-btn" id="modeBarcode" onclick="setMode('barcode')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14M21 5v2M21 17v2M21 11v2"/></svg>
+      Barcode
+    </button>
+    <button class="mode-btn" id="modeLabel" onclick="setMode('label')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+      Record Label
+    </button>
+  </div>
+  <div class="mode-hint" id="modeHint">Photograph the album or sleeve cover art</div>
 
   <div class="drop-zone" id="dropZone"
        onclick="document.getElementById('fileInput').click()"
@@ -731,7 +814,7 @@
 
 <button class="btn-primary" id="recognizeBtn" onclick="recognize()" disabled>
   <div class="spinner"></div>
-  <span class="btn-label">
+  <span class="btn-label" id="recognizeBtnLabel">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     Recognize Album
   </span>
@@ -745,6 +828,82 @@
   let imageBase64 = null;
   let imageMediaType = null;
   let authToken = localStorage.getItem('vinyl_token') || '';
+  let scanMode = 'cover';
+
+  const MODE_CONFIG = {
+    cover:   { hint: 'Photograph the album or sleeve cover art', btn: 'Recognize Album' },
+    barcode: { hint: 'Photograph the barcode on the sleeve or inner sleeve', btn: 'Read Barcode' },
+    label:   { hint: 'Photograph the center label on the vinyl record itself', btn: 'Read Label' },
+  };
+
+  function setMode(mode) {
+    scanMode = mode;
+    ['cover','barcode','label'].forEach(m => {
+      document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1))
+              .classList.toggle('active', m === mode);
+    });
+    document.getElementById('modeHint').textContent = MODE_CONFIG[mode].hint;
+    document.getElementById('recognizeBtnLabel').lastChild.textContent = ' ' + MODE_CONFIG[mode].btn;
+  }
+
+  function getPrompt() {
+    if (scanMode === 'barcode') {
+      return `Read the barcode (UPC/EAN/other) number from this image. Extract only the numeric digits.
+
+Return ONLY JSON:
+{
+  "found": true,
+  "barcode": "0724349994324",
+  "format": "UPC-A"
+}
+
+If no barcode is visible or readable: { "found": false, "notes": "reason" }`;
+    }
+    if (scanMode === 'label') {
+      return `You are an expert in vinyl record pressing identification. Read ALL text on this vinyl record center label carefully.
+
+Return ONLY JSON:
+{
+  "found": true,
+  "title": "Album Title",
+  "artist": "Artist Name",
+  "year": "YYYY",
+  "label_name": "Label Name (e.g. Harvest, Columbia, Blue Note)",
+  "catalog_number": "SHVL 804",
+  "side": "A",
+  "matrix": "SHVL 804-A-1",
+  "country": "UK",
+  "notes": "Any pressing details (original/reissue, stereo/mono, etc.)",
+  "searchQuery": "artist title"
+}
+
+If cannot read: { "found": false, "notes": "reason" }`;
+    }
+    // cover mode
+    return `You are an expert in vinyl records and music history.
+
+Analyze this image of a vinyl record album cover and identify it.
+
+Respond ONLY with a JSON object (no markdown, no extra text) in this exact format:
+{
+  "found": true,
+  "title": "Album Title",
+  "artist": "Artist Name",
+  "year": "YYYY",
+  "genre": "Genre",
+  "confidence": "high|medium|low",
+  "notes": "Brief interesting note about the album (1-2 sentences)",
+  "searchQuery": "artist album title"
+}
+
+If you cannot identify the album, respond with:
+{
+  "found": false,
+  "notes": "Reason why identification failed"
+}
+
+Be as accurate as possible. The searchQuery field should be optimized for finding the album on streaming platforms.`;
+  }
 
   // --- Auth ---
   async function initAuth() {
@@ -1022,29 +1181,7 @@
     btn.classList.add('loading');
     document.getElementById('results').innerHTML = '';
 
-    const prompt = `You are an expert in vinyl records and music history.
-
-Analyze this image of a vinyl record album cover and identify it.
-
-Respond ONLY with a JSON object (no markdown, no extra text) in this exact format:
-{
-  "found": true,
-  "title": "Album Title",
-  "artist": "Artist Name",
-  "year": "YYYY",
-  "genre": "Genre",
-  "confidence": "high|medium|low",
-  "notes": "Brief interesting note about the album (1-2 sentences)",
-  "searchQuery": "artist album title"
-}
-
-If you cannot identify the album, respond with:
-{
-  "found": false,
-  "notes": "Reason why identification failed"
-}
-
-Be as accurate as possible. The searchQuery field should be optimized for finding the album on streaming platforms.`;
+    const prompt = getPrompt();
 
     try {
       const response = await fetch('/api/recognize', {
@@ -1081,8 +1218,16 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
         throw new Error('Could not parse response from Claude. Raw: ' + raw.slice(0, 200));
       }
 
-      renderResult(result);
-      if (result.found) fetchDiscogsPrice(result.artist, result.title);
+      if (scanMode === 'barcode') {
+        renderBarcodeResult(result);
+        if (result.found) fetchDiscogsPrice('', '', result.barcode);
+      } else if (scanMode === 'label') {
+        renderResult(result, true);
+        if (result.found) fetchDiscogsPrice(result.artist, result.title, '', result.catalog_number);
+      } else {
+        renderResult(result, false);
+        if (result.found) fetchDiscogsPrice(result.artist, result.title);
+      }
 
     } catch (err) {
       showError(err.message || 'An unexpected error occurred.');
@@ -1093,13 +1238,32 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
     }
   }
 
-  function renderResult(r) {
+  function renderBarcodeResult(r) {
+    const el = document.getElementById('results');
+    if (!r.found) {
+      el.innerHTML = `<div class="error-box"><strong>No barcode detected.</strong><br>${escHtml(r.notes || 'Try a clearer photo with better lighting.')}</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="result-card">
+        <div class="barcode-result">
+          <svg width="32" height="20" viewBox="0 0 32 20" fill="none" style="margin-bottom:8px">
+            ${[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30].map((x,i)=>`<rect x="${x}" y="0" width="${i%3===0?2:1}" height="20" fill="currentColor" opacity="${0.6+i%4*0.1}"/>`).join('')}
+          </svg>
+          <div class="barcode-number">${escHtml(r.barcode)}</div>
+          <div class="barcode-label">${escHtml(r.format || 'Barcode')} — looking up on Discogs...</div>
+        </div>
+        <div id="discogs-price"></div>
+      </div>`;
+  }
+
+  function renderResult(r, isPressing = false) {
     const el = document.getElementById('results');
 
     if (!r.found) {
       el.innerHTML = `
         <div class="error-box">
-          <strong>Album not identified.</strong><br>${r.notes || 'Could not recognize the album artwork. Try a clearer photo.'}
+          <strong>${isPressing ? 'Label not readable.' : 'Album not identified.'}</strong><br>${escHtml(r.notes || 'Try a clearer photo.')}
         </div>`;
       return;
     }
@@ -1109,6 +1273,15 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
     const youtubeUrl  = `https://www.youtube.com/results?search_query=${query}`;
 
     const confClass = r.confidence === 'high' ? '' : r.confidence === 'medium' ? 'medium' : 'low';
+
+    const pressingHtml = isPressing ? `
+      <div class="pressing-details">
+        ${r.label_name ? `<strong>Label:</strong> ${escHtml(r.label_name)}<br>` : ''}
+        ${r.catalog_number ? `<strong>Cat#:</strong> ${escHtml(r.catalog_number)}<br>` : ''}
+        ${r.side ? `<strong>Side:</strong> ${escHtml(r.side)}<br>` : ''}
+        ${r.matrix ? `<strong>Matrix:</strong> ${escHtml(r.matrix)}<br>` : ''}
+        ${r.country ? `<strong>Country:</strong> ${escHtml(r.country)}` : ''}
+      </div>` : '';
 
     el.innerHTML = `
       <div class="result-card">
@@ -1126,14 +1299,13 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
             <div class="album-title">${escHtml(r.title)}</div>
             <div class="album-artist">${escHtml(r.artist)}</div>
             ${r.year ? `<div class="album-year">${escHtml(r.year)}${r.genre ? ' &middot; ' + escHtml(r.genre) : ''}</div>` : ''}
-            <div class="confidence">
-              <div class="dot ${confClass}"></div>
-              ${r.confidence || 'unknown'} confidence
-            </div>
+            ${!isPressing ? `<div class="confidence"><div class="dot ${confClass}"></div>${r.confidence || 'unknown'} confidence</div>` : ''}
           </div>
         </div>
 
-        <div class="stream-links">
+        ${pressingHtml}
+
+        <div class="stream-links" style="margin-top:14px">
           <a class="stream-btn spotify" href="${spotifyUrl}" target="_blank" rel="noopener">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.208c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 1 1-.277-1.216c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.973-.519.781.781 0 0 1 .519-.972c3.632-1.102 8.147-.568 11.234 1.328a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 0 1-.583-1.782c3.533-1.155 9.404-.932 13.115 1.338a.937.937 0 0 1-.915 1.601z"/></svg>
             Spotify
@@ -1149,7 +1321,7 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
       </div>`;
   }
 
-  async function fetchDiscogsPrice(artist, title) {
+  async function fetchDiscogsPrice(artist, title, barcode = '', catno = '') {
     const el = document.getElementById('discogs-price');
     if (!el) return;
 
@@ -1163,7 +1335,7 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
       const resp = await fetch('/api/discogs-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ artist, title })
+        body: JSON.stringify({ artist, title, barcode, catno })
       });
       const data = await resp.json();
 
@@ -1174,6 +1346,21 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
             <div class="price-loading" style="color:var(--muted)">Not found on Discogs.</div>
           </div>`;
         return;
+      }
+
+      // For barcode lookups, show matched release info above prices
+      if (barcode && data.release_title) {
+        const infoEl = document.querySelector('.barcode-label');
+        if (infoEl) infoEl.innerHTML = `Matched: <strong style="color:var(--text)">${escHtml(data.release_title)}</strong>${data.country ? ' &middot; ' + escHtml(data.country) : ''}${data.format ? ' &middot; ' + escHtml(data.format) : ''}`;
+      }
+      // For label lookups, show confirmed pressing info from Discogs
+      if (catno && data.release_title) {
+        const pressingEl = document.querySelector('.pressing-details');
+        if (pressingEl && data.catno) {
+          const extra = document.createElement('div');
+          extra.innerHTML = `<strong>Discogs:</strong> ${escHtml(data.release_title)}${data.country ? ' &middot; ' + escHtml(data.country) : ''}`;
+          pressingEl.appendChild(extra);
+        }
       }
 
       const fmt = v => v?.value != null ? `$${parseFloat(v.value).toFixed(2)}` : 'N/A';
