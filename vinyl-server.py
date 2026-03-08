@@ -279,11 +279,14 @@ class Handler(BaseHTTPRequestHandler):
             req3 = urllib.request.Request(listings_url, headers=discogs_headers)
             with urllib.request.urlopen(req3, timeout=8) as resp:
                 listings_data = json.loads(resp.read())
-            prices = [
-                l["price"]["value"]
-                for l in listings_data.get("results", [])
-                if isinstance(l.get("price"), dict) and l["price"].get("value") is not None
-            ]
+            raw_listings = listings_data.get("listings", listings_data.get("results", []))
+            prices = []
+            for l in raw_listings:
+                p = l.get("price")
+                if isinstance(p, dict) and p.get("value") is not None:
+                    prices.append(float(p["value"]))
+                elif isinstance(p, (int, float)):
+                    prices.append(float(p))
             if prices:
                 currency = stats.get("lowest_price", {}).get("currency", "USD") if stats.get("lowest_price") else "USD"
                 highest_price = {"value": max(prices), "currency": currency}
