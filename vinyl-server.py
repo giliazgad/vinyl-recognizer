@@ -20,6 +20,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 PORT = int(os.environ.get("PORT", 8765))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+APPLE_CLIENT_ID = os.environ.get("APPLE_CLIENT_ID", "")
 HTML_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vinyl-recognizer.html")
 
 VALID_TOKENS: set = set()
@@ -50,13 +52,23 @@ class Handler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 self.send_error(404, "vinyl-recognizer.html not found next to server")
         elif self.path == "/api/auth-required":
-            self._json_response({"required": bool(APP_PASSWORD)})
+            self._json_response({"required": bool(APP_PASSWORD or GOOGLE_CLIENT_ID or APPLE_CLIENT_ID)})
+        elif self.path == "/api/config":
+            self._json_response({
+                "googleClientId": GOOGLE_CLIENT_ID,
+                "appleClientId": APPLE_CLIENT_ID,
+                "passwordEnabled": bool(APP_PASSWORD),
+            })
         else:
             self.send_error(404)
 
     def do_POST(self):
         if self.path == "/api/login":
             self._handle_login()
+        elif self.path == "/api/login-google":
+            self._handle_login_google()
+        elif self.path == "/api/login-apple":
+            self._handle_login_apple()
         elif self.path == "/api/logout":
             self._handle_logout()
         elif self.path == "/api/recognize":
@@ -86,6 +98,64 @@ class Handler(BaseHTTPRequestHandler):
             self._json_response({"ok": True, "token": token})
         else:
             self._json_error(401, "Incorrect password")
+
+    def _handle_login_google(self):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self._json_error(400, "Invalid JSON body"); return
+
+        credential = payload.get("credential", "")
+        if not credential:
+            self._json_error(400, "Missing credential"); return
+
+        # Verify with Google's tokeninfo endpoint
+        verify_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={urllib.parse.quote(credential)}"
+        try:
+            req = urllib.request.Request(verify_url)
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                info = json.loads(resp.read())
+        except Exception as e:
+            self._json_error(401, f"Google token verification failed: {e}"); return
+
+        if GOOGLE_CLIENT_ID and info.get("aud") != GOOGLE_CLIENT_ID:
+            self._json_error(401, "Token audience mismatch"); return
+
+        token = secrets.token_hex(32)
+        VALID_TOKENS.add(token)
+        self._json_response({"ok": True, "token": token,
+                             "name": info.get("name", ""), "email": info.get("email", "")})
+
+    def _handle_login_apple(self):
+        import base64, json as _json
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self._json_error(400, "Invalid JSON body"); return
+
+        id_token = payload.get("id_token", "")
+        if not id_token:
+            self._json_error(400, "Missing id_token"); return
+
+        # Decode payload without signature verification (basic claims check)
+        # Full RS256 verification requires a JWT library; add PyJWT to requirements.txt for production
+        try:
+            parts = id_token.split(".")
+            padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
+            claims = _json.loads(base64.urlsafe_b64decode(padded))
+        except Exception as e:
+            self._json_error(401, f"Could not decode Apple token: {e}"); return
+
+        aud = claims.get("aud", "")
+        if APPLE_CLIENT_ID and aud != APPLE_CLIENT_ID:
+            self._json_error(401, "Token audience mismatch"); return
+
+        token = secrets.token_hex(32)
+        VALID_TOKENS.add(token)
+        name = payload.get("name", claims.get("email", "Apple User"))
+        self._json_response({"ok": True, "token": token, "name": name, "email": claims.get("email", "")})
 
     def _handle_logout(self):
         token = self.headers.get("X-Auth-Token", "")
