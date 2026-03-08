@@ -58,6 +58,7 @@ class Handler(BaseHTTPRequestHandler):
                 "googleClientId": GOOGLE_CLIENT_ID,
                 "appleClientId": APPLE_CLIENT_ID,
                 "passwordEnabled": bool(APP_PASSWORD),
+                "hasApiKey": bool(ANTHROPIC_API_KEY),
             })
         else:
             self.send_error(404)

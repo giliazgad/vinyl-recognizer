@@ -757,6 +757,12 @@
 
     if (!required) { showApp(); return; }
 
+    // Hide API key card if server has its own key
+    if (cfg.hasApiKey) {
+      const apiCard = document.querySelector('.card');
+      if (apiCard) apiCard.style.display = 'none';
+    }
+
     // Build login UI based on config
     if (cfg.googleClientId || cfg.appleClientId) {
       document.getElementById('socialBtns').style.display = 'flex';
