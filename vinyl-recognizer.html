@@ -898,7 +898,8 @@ Return ONLY JSON:
   "searchQuery": "artist title"
 }
 
-If cannot read: { "found": false, "notes": "reason" }`;
+If cannot read: { "found": false, "notes": "reason" }
+IMPORTANT: Use native language/script for title, artist, and searchQuery (Hebrew, Japanese, Arabic, etc. — do not transliterate).`;
     }
     // cover mode
     return `You are an expert in vinyl records and music history.
@@ -923,7 +924,8 @@ If you cannot identify the album, respond with:
   "notes": "Reason why identification failed"
 }
 
-Be as accurate as possible. The searchQuery field should be optimized for finding the album on streaming platforms.`;
+Be as accurate as possible.
+IMPORTANT: Use the album's NATIVE language and script for title, artist, and searchQuery. If the album is in Hebrew, use Hebrew characters (e.g. "להקת כוורת"). If Japanese, use Japanese. If Arabic, use Arabic script. Do NOT transliterate to Latin characters — Spotify and YouTube search by native script.`;
   }
 
   // --- Auth ---
