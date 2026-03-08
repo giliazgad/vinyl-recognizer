@@ -35,8 +35,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _authed(self):
         """Return True if auth is disabled or the request carries a valid token."""
-        if not APP_PASSWORD:
-            return True
+        if not (APP_PASSWORD or GOOGLE_CLIENT_ID or APPLE_CLIENT_ID):
+            return True  # no auth configured at all
         token = self.headers.get("X-Auth-Token", "")
         return token in VALID_TOKENS
 

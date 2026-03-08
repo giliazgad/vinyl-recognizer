@@ -981,27 +981,46 @@ Do NOT transliterate, romanize, or translate. Streaming platforms index content 
     document.getElementById('login-screen').classList.remove('hidden');
   }
 
+  let _googleReady = false;
+
   function loadGoogleSignIn(clientId) {
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
+    s.onerror = () => {
+      document.getElementById('loginError').textContent = 'Could not load Google Sign-In. Check your connection or try disabling your ad-blocker.';
+      document.getElementById('googleBtn').disabled = false;
+    };
     s.onload = () => {
       google.accounts.id.initialize({ client_id: clientId, callback: handleGoogleCredential });
+      _googleReady = true;
+      // Show One Tap automatically if available
+      google.accounts.id.prompt(() => {});
     };
     document.head.appendChild(s);
   }
 
   async function signInWithGoogle() {
-    document.getElementById('googleBtn').disabled = true;
-    document.getElementById('loginError').textContent = '';
-    google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        // Fall back to popup
-        google.accounts.id.renderButton(document.getElementById('googleBtn'), {
-          theme: 'filled_black', size: 'large', width: 316
-        });
-        document.getElementById('googleBtn').disabled = false;
-      }
-    });
+    const btn = document.getElementById('googleBtn');
+    const errEl = document.getElementById('loginError');
+    btn.disabled = true;
+    errEl.textContent = '';
+    if (!_googleReady) {
+      errEl.textContent = 'Google Sign-In is still loading, please try again in a moment.';
+      btn.disabled = false;
+      return;
+    }
+    try {
+      // Use renderButton which opens a reliable popup flow
+      google.accounts.id.renderButton(btn, { theme: 'filled_black', size: 'large', width: 316 });
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          btn.disabled = false;
+        }
+      });
+    } catch (e) {
+      errEl.textContent = 'Google Sign-In failed to open. Try refreshing the page.';
+      btn.disabled = false;
+    }
   }
 
   async function handleGoogleCredential(response) {
