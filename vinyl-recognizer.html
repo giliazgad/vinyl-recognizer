@@ -1212,15 +1212,17 @@ Do NOT transliterate, romanize, or translate. Streaming platforms index content 
 
   function updateRecognizeBtn() {
     const key = document.getElementById('apiKey').value.trim() || localStorage.getItem('claude_api_key');
-    document.getElementById('recognizeBtn').disabled = !(imageBase64 && key);
+    const serverHasKey = document.querySelector('.card')?.style.display === 'none'; // hidden = server key set
+    document.getElementById('recognizeBtn').disabled = !(imageBase64 && (key || serverHasKey));
   }
 
   document.getElementById('apiKey').addEventListener('input', updateRecognizeBtn);
 
   // --- Recognition ---
   async function recognize() {
-    const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('claude_api_key');
-    if (!apiKey) { showError('Please enter your Claude API key first.'); return; }
+    const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('claude_api_key') || '';
+    const serverHasKey = document.querySelector('.card')?.style.display === 'none';
+    if (!apiKey && !serverHasKey) { showError('Please enter your Claude API key first.'); return; }
     if (!imageBase64) { showError('Please select an image first.'); return; }
 
     const btn = document.getElementById('recognizeBtn');
