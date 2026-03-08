@@ -899,7 +899,7 @@ Return ONLY JSON:
 }
 
 If cannot read: { "found": false, "notes": "reason" }
-IMPORTANT: Use native language/script for title, artist, and searchQuery (Hebrew, Japanese, Arabic, etc. — do not transliterate).`;
+CRITICAL: Always use the original native language and script for title, artist, and searchQuery — Hebrew, Japanese, Arabic, Korean, Russian, Greek, French accents, Portuguese, etc. Never transliterate.`;
     }
     // cover mode
     return `You are an expert in vinyl records and music history.
@@ -925,7 +925,12 @@ If you cannot identify the album, respond with:
 }
 
 Be as accurate as possible.
-IMPORTANT: Use the album's NATIVE language and script for title, artist, and searchQuery. If the album is in Hebrew, use Hebrew characters (e.g. "להקת כוורת"). If Japanese, use Japanese. If Arabic, use Arabic script. Do NOT transliterate to Latin characters — Spotify and YouTube search by native script.`;
+CRITICAL: Always use the album's ORIGINAL native language and script for title, artist, and searchQuery — for every language without exception:
+- Hebrew → Hebrew (עברית), Japanese → Japanese (日本語), Arabic → Arabic (العربية)
+- Korean → Korean (한국어), Russian → Cyrillic, Greek → Greek script
+- French, Portuguese, Spanish, German, Italian → use the original accented characters exactly (é, ç, ã, ü, ñ, etc.)
+- Chinese → Chinese characters, Thai → Thai script, etc.
+Do NOT transliterate, romanize, or translate. Streaming platforms index content in its original script and spelling.`;
   }
 
   // --- Auth ---
