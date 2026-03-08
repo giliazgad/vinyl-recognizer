@@ -1383,13 +1383,17 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
       const fmt = v => v?.value != null ? `$${parseFloat(v.value).toFixed(2)}` : 'N/A';
       const lowest  = fmt(data.lowest_price);
       const highest = fmt(data.highest_price);
-      const avg     = fmt(data.avg_price);
+      const median  = fmt(data.median_price);
       const forSale = data.num_for_sale ?? 0;
+
+      const catnoBadge = data.catno
+        ? `<span style="font-size:0.75rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;margin-left:6px">${escHtml(data.catno)}</span>`
+        : '';
 
       el.innerHTML = `
         <div class="discogs-section">
           <div class="discogs-header">
-            <span class="discogs-label">Discogs Marketplace</span>
+            <span class="discogs-label">Discogs Marketplace${catnoBadge}</span>
             <a class="discogs-link" href="${data.discogs_url}" target="_blank" rel="noopener">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
               View on Discogs
@@ -1398,15 +1402,15 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
           <div class="price-grid">
             <div class="price-item">
               <div class="price-value">${lowest}</div>
-              <div class="price-sub">Lowest</div>
+              <div class="price-sub">Low</div>
             </div>
             <div class="price-item">
-              <div class="price-value">${avg}</div>
-              <div class="price-sub">Average</div>
+              <div class="price-value">${median}</div>
+              <div class="price-sub">Median</div>
             </div>
             <div class="price-item">
               <div class="price-value">${highest}</div>
-              <div class="price-sub">Highest</div>
+              <div class="price-sub">High</div>
             </div>
             <div class="price-item">
               <div class="price-value">${forSale}</div>

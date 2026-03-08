@@ -266,7 +266,7 @@ class Handler(BaseHTTPRequestHandler):
 
         # 3. Fetch listings to compute average and highest price
         highest_price = None
-        avg_price = None
+        median_price = None
         listings_url = (
             f"https://api.discogs.com/marketplace/search"
             f"?release_id={release_id}&status=For+Sale&per_page=100&sort=price&sort_order=asc"
@@ -283,7 +283,10 @@ class Handler(BaseHTTPRequestHandler):
             if prices:
                 currency = stats.get("lowest_price", {}).get("currency", "USD") if stats.get("lowest_price") else "USD"
                 highest_price = {"value": max(prices), "currency": currency}
-                avg_price = {"value": round(sum(prices) / len(prices), 2), "currency": currency}
+                s = sorted(prices)
+                n = len(s)
+                mid = (s[n // 2 - 1] + s[n // 2]) / 2 if n % 2 == 0 else s[n // 2]
+                median_price = {"value": round(mid, 2), "currency": currency}
         except Exception:
             pass  # listings endpoint may require auth; silently skip
 
@@ -300,7 +303,7 @@ class Handler(BaseHTTPRequestHandler):
             "format": ", ".join(format_list) if format_list else "",
             "lowest_price": stats.get("lowest_price"),
             "highest_price": highest_price,
-            "avg_price": avg_price,
+            "median_price": median_price,
             "num_for_sale": stats.get("num_for_sale", 0),
             "discogs_url": discogs_url,
         })
