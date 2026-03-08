@@ -11,7 +11,7 @@ The server reads the API key from the ANTHROPIC_API_KEY environment variable.
 
 import json
 import os
-import sys
+import secrets
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -19,13 +19,23 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = int(os.environ.get("PORT", 8765))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 HTML_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vinyl-recognizer.html")
+
+VALID_TOKENS: set = set()
 
 
 class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         print(f"  {self.address_string()} - {format % args}")
+
+    def _authed(self):
+        """Return True if auth is disabled or the request carries a valid token."""
+        if not APP_PASSWORD:
+            return True
+        token = self.headers.get("X-Auth-Token", "")
+        return token in VALID_TOKENS
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
@@ -38,17 +48,49 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(content)
             except FileNotFoundError:
-                self.send_error(404, f"vinyl-recognizer.html not found next to server")
+                self.send_error(404, "vinyl-recognizer.html not found next to server")
+        elif self.path == "/api/auth-required":
+            self._json_response({"required": bool(APP_PASSWORD)})
         else:
             self.send_error(404)
 
     def do_POST(self):
-        if self.path == "/api/recognize":
+        if self.path == "/api/login":
+            self._handle_login()
+        elif self.path == "/api/logout":
+            self._handle_logout()
+        elif self.path == "/api/recognize":
+            if not self._authed():
+                self._json_error(401, "Unauthorized")
+                return
             self._handle_recognize()
         elif self.path == "/api/discogs-price":
+            if not self._authed():
+                self._json_error(401, "Unauthorized")
+                return
             self._handle_discogs_price()
         else:
             self.send_error(404)
+
+    def _handle_login(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            self._json_error(400, "Invalid JSON body")
+            return
+        if not APP_PASSWORD or payload.get("password") == APP_PASSWORD:
+            token = secrets.token_hex(32)
+            VALID_TOKENS.add(token)
+            self._json_response({"ok": True, "token": token})
+        else:
+            self._json_error(401, "Incorrect password")
+
+    def _handle_logout(self):
+        token = self.headers.get("X-Auth-Token", "")
+        VALID_TOKENS.discard(token)
+        self._json_response({"ok": True})
 
     def _handle_recognize(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -192,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Auth-Token")
         self.end_headers()
 
     def _json_error(self, code, message):
