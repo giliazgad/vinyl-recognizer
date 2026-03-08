@@ -22,6 +22,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 APPLE_CLIENT_ID = os.environ.get("APPLE_CLIENT_ID", "")
+DISCOGS_TOKEN = os.environ.get("DISCOGS_TOKEN", "")
 HTML_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vinyl-recognizer.html")
 
 VALID_TOKENS: set = set()
@@ -227,6 +228,9 @@ class Handler(BaseHTTPRequestHandler):
         barcode = payload.get("barcode", "")
         catno = payload.get("catno", "")
         ua = "VinylRecognizer/1.0"
+        discogs_headers = {"User-Agent": ua}
+        if DISCOGS_TOKEN:
+            discogs_headers["Authorization"] = f"Discogs token={DISCOGS_TOKEN}"
 
         # 1. Search Discogs — prefer barcode > catno > text query
         if barcode:
@@ -237,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
             query = urllib.parse.quote(f"{artist} {title}".strip())
             search_url = f"https://api.discogs.com/database/search?q={query}&type=release&per_page=3"
         try:
-            req = urllib.request.Request(search_url, headers={"User-Agent": ua})
+            req = urllib.request.Request(search_url, headers=discogs_headers)
             with urllib.request.urlopen(req, timeout=8) as resp:
                 search_data = json.loads(resp.read())
         except Exception as e:
@@ -258,7 +262,7 @@ class Handler(BaseHTTPRequestHandler):
         # 2. Fetch marketplace stats (lowest price + count)
         stats_url = f"https://api.discogs.com/marketplace/stats/{release_id}?curr_abbr=USD"
         try:
-            req2 = urllib.request.Request(stats_url, headers={"User-Agent": ua})
+            req2 = urllib.request.Request(stats_url, headers=discogs_headers)
             with urllib.request.urlopen(req2, timeout=8) as resp:
                 stats = json.loads(resp.read())
         except Exception:
@@ -272,7 +276,7 @@ class Handler(BaseHTTPRequestHandler):
             f"?release_id={release_id}&status=For+Sale&per_page=100&sort=price&sort_order=asc"
         )
         try:
-            req3 = urllib.request.Request(listings_url, headers={"User-Agent": ua})
+            req3 = urllib.request.Request(listings_url, headers=discogs_headers)
             with urllib.request.urlopen(req3, timeout=8) as resp:
                 listings_data = json.loads(resp.read())
             prices = [
@@ -294,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
         community = {}
         try:
             rel_url = f"https://api.discogs.com/releases/{release_id}"
-            req4 = urllib.request.Request(rel_url, headers={"User-Agent": ua})
+            req4 = urllib.request.Request(rel_url, headers=discogs_headers)
             with urllib.request.urlopen(req4, timeout=8) as resp:
                 rel_data = json.loads(resp.read())
             c = rel_data.get("community", {})
