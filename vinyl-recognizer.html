@@ -1414,22 +1414,23 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
       const ratingAvg = c.rating_avg ?? 0;
       const ratingCount = c.rating_count ?? 0;
 
-      const stars = (() => {
-        let s = '';
-        for (let i = 1; i <= 5; i++) {
-          s += ratingAvg >= i - 0.25 ? '★' : ratingAvg >= i - 0.75 ? '½' : '☆';
-        }
-        return s;
-      })();
+      let stars = '';
+      for (let i = 1; i <= 5; i++) {
+        stars += ratingAvg >= i - 0.25 ? '\u2605' : ratingAvg >= i - 0.75 ? '\u00BD' : '\u2606';
+      }
+
+      const ratingHtml = ratingCount > 0
+        ? '<div class="cs-divider"></div><div class="cs-block"><div class="cs-rating-stars">' + stars + '</div><div class="cs-rating-sub">' + ratingAvg + ' &middot; ' + ratingCount + ' rating' + (ratingCount !== 1 ? 's' : '') + '</div></div>'
+        : '';
 
       const catnoBadge = data.catno
-        ? ` <span style="font-size:0.72rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 7px">${escHtml(data.catno)}</span>`
+        ? ' <span style="font-size:0.72rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 7px">' + escHtml(data.catno) + '</span>'
         : '';
 
       el.innerHTML = `
         <div class="discogs-section">
           <div class="discogs-header">
-            <span class="discogs-label">Discogs${catnoBadge}</span>
+            <span class="discogs-label">Discogs` + catnoBadge + `</span>
             <a class="discogs-link" href="${data.discogs_url}" target="_blank" rel="noopener">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
               View on Discogs
@@ -1446,12 +1447,7 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
               <div class="cs-num">${want}</div>
               <div class="cs-lbl">want</div>
             </div>
-            ${ratingCount > 0 ? `
-            <div class="cs-divider"></div>
-            <div class="cs-block">
-              <div class="cs-rating-stars">${stars}</div>
-              <div class="cs-rating-sub">${ratingAvg} &middot; ${ratingCount} rating${ratingCount !== 1 ? 's' : ''}</div>
-            </div>` : ''}
+` + ratingHtml + `
             <div class="cs-divider"></div>
             <div class="cs-block">
               <div class="cs-num">${forSale}</div>
