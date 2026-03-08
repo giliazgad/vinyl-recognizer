@@ -268,34 +268,42 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             stats = {}
 
-        # 3. Fetch listings to compute average and highest price
+        # 3. Fetch listings to compute median and highest price (requires DISCOGS_TOKEN)
         highest_price = None
         median_price = None
-        listings_url = (
-            f"https://api.discogs.com/marketplace/search"
-            f"?release_id={release_id}&status=For+Sale&per_page=100&sort=price&sort_order=asc"
-        )
-        try:
-            req3 = urllib.request.Request(listings_url, headers=discogs_headers)
-            with urllib.request.urlopen(req3, timeout=8) as resp:
-                listings_data = json.loads(resp.read())
-            raw_listings = listings_data.get("listings", listings_data.get("results", []))
-            prices = []
-            for l in raw_listings:
-                p = l.get("price")
-                if isinstance(p, dict) and p.get("value") is not None:
-                    prices.append(float(p["value"]))
-                elif isinstance(p, (int, float)):
-                    prices.append(float(p))
-            if prices:
-                currency = stats.get("lowest_price", {}).get("currency", "USD") if stats.get("lowest_price") else "USD"
-                highest_price = {"value": max(prices), "currency": currency}
-                s = sorted(prices)
-                n = len(s)
-                mid = (s[n // 2 - 1] + s[n // 2]) / 2 if n % 2 == 0 else s[n // 2]
-                median_price = {"value": round(mid, 2), "currency": currency}
-        except Exception:
-            pass  # listings endpoint may require auth; silently skip
+        listings_error = None if DISCOGS_TOKEN else "no_token"
+        if DISCOGS_TOKEN:
+            listings_url = (
+                f"https://api.discogs.com/marketplace/search"
+                f"?release_id={release_id}&status=For+Sale&per_page=100&sort=price&sort_order=asc"
+            )
+            try:
+                req3 = urllib.request.Request(listings_url, headers=discogs_headers)
+                with urllib.request.urlopen(req3, timeout=10) as resp:
+                    listings_data = json.loads(resp.read())
+                # Check for API error message
+                if "message" in listings_data:
+                    listings_error = listings_data["message"]
+                else:
+                    raw_listings = listings_data.get("listings", listings_data.get("results", []))
+                    prices = []
+                    for l in raw_listings:
+                        p = l.get("price")
+                        if isinstance(p, dict) and p.get("value") is not None:
+                            prices.append(float(p["value"]))
+                        elif isinstance(p, (int, float)):
+                            prices.append(float(p))
+                    if prices:
+                        currency = stats.get("lowest_price", {}).get("currency", "USD") if stats.get("lowest_price") else "USD"
+                        highest_price = {"value": max(prices), "currency": currency}
+                        s = sorted(prices)
+                        n = len(s)
+                        mid = (s[n // 2 - 1] + s[n // 2]) / 2 if n % 2 == 0 else s[n // 2]
+                        median_price = {"value": round(mid, 2), "currency": currency}
+            except urllib.error.HTTPError as e:
+                listings_error = f"HTTP {e.code}: {e.read().decode()[:100]}"
+            except Exception as e:
+                listings_error = str(e)[:100]
 
         # 4. Fetch community stats (have/want/rating)
         community = {}
@@ -328,6 +336,7 @@ class Handler(BaseHTTPRequestHandler):
             "lowest_price": stats.get("lowest_price"),
             "highest_price": highest_price,
             "median_price": median_price,
+            "listings_error": listings_error,
             "num_for_sale": stats.get("num_for_sale", 0),
             "community": community,
             "discogs_url": discogs_url,

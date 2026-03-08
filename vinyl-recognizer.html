@@ -1402,11 +1402,15 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
       }
 
       const curr = data.lowest_price?.currency || data.median_price?.currency || 'USD';
-      const fmt = v => v?.value != null ? `${parseFloat(v.value).toFixed(2)}` : 'N/A';
+      const fmt = v => v?.value != null ? `${parseFloat(v.value).toFixed(2)}` : '—';
       const lowest  = fmt(data.lowest_price);
       const highest = fmt(data.highest_price);
       const median  = fmt(data.median_price);
       const forSale = data.num_for_sale ?? 0;
+      const needsToken = data.listings_error === 'no_token';
+      const listingsNote = needsToken
+        ? '<div style="font-size:0.72rem;color:var(--muted);margin-top:8px;text-align:center">Add <strong style="color:var(--text)">DISCOGS_TOKEN</strong> env var for Median &amp; High</div>'
+        : (data.listings_error ? '<div style="font-size:0.72rem;color:#f87171;margin-top:8px">Marketplace error: ' + data.listings_error + '</div>' : '');
 
       const c = data.community || {};
       const have = c.have ?? '–';
@@ -1477,6 +1481,7 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
               <div class="sr-curr">${curr}</div>
             </div>
           </div>
+          ` + listingsNote + `
         </div>`;
 
     } catch (_) {
