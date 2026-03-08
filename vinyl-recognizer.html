@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vinyl Record Recognizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #17171a;
+      --surface2: #1f1f24;
+      --border: #2e2e36;
+      --accent: #a855f7;
+      --accent2: #7c3aed;
+      --spotify: #1DB954;
+      --youtube: #FF0000;
+      --text: #f0f0f5;
+      --muted: #7a7a8c;
+      --radius: 16px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .vinyl-icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 16px;
+      position: relative;
+      animation: spin 8s linear infinite;
+    }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .vinyl-icon svg { width: 100%; height: 100%; }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+
+    .subtitle { color: var(--muted); font-size: 0.9rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 560px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* API Key */
+    .api-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .api-input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 10px 40px 10px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    .toggle-pw {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+      line-height: 0;
+    }
+
+    .toggle-pw:hover { color: var(--text); }
+
+    .btn-save {
+      background: var(--accent2);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    .btn-save:hover { background: var(--accent); }
+
+    .api-status {
+      font-size: 0.78rem;
+      margin-top: 8px;
+      color: var(--muted);
+    }
+
+    .api-status.ok { color: #4ade80; }
+    .api-status.err { color: #f87171; }
+
+    /* Image area */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(168, 85, 247, 0.06);
+    }
+
+    .drop-zone img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .drop-zone-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .drop-zone-inner svg { opacity: 0.5; }
+
+    .drop-zone-inner p { font-size: 0.88rem; text-align: center; line-height: 1.5; }
+
+    .drop-zone-inner span { font-size: 0.75rem; }
+
+    .img-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .btn-secondary:hover { border-color: var(--accent); background: rgba(168,85,247,0.08); }
+
+    #fileInput, #cameraInput { display: none; }
+
+    /* Recognize button */
+    .btn-primary {
+      width: 100%;
+      max-width: 560px;
+      background: linear-gradient(135deg, var(--accent2), #ec4899);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 14px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    .loading .spinner { display: block; }
+    .loading .btn-label { display: none; }
+
+    /* Results */
+    #results { width: 100%; max-width: 560px; }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .album-info {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .album-thumb {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .album-thumb-placeholder {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      background: var(--surface2);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .album-meta { flex: 1; }
+
+    .album-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .album-artist {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 4px;
+    }
+
+    .album-year {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .confidence {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.73rem;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px 8px;
+      margin-top: 6px;
+    }
+
+    .confidence .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+
+    .confidence .dot.medium { background: #facc15; }
+    .confidence .dot.low { background: #f87171; }
+
+    .stream-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stream-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 700;
+      border: 2px solid transparent;
+      transition: opacity 0.2s, transform 0.1s;
+      cursor: pointer;
+    }
+
+    .stream-btn:active { transform: scale(0.97); }
+    .stream-btn:hover { opacity: 0.88; }
+
+    .stream-btn.spotify {
+      background: var(--spotify);
+      color: #000;
+    }
+
+    .stream-btn.youtube {
+      background: var(--youtube);
+      color: #fff;
+    }
+
+    .notes {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .discogs-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .discogs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .discogs-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .discogs-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #d4a843;
+      text-decoration: none;
+      background: rgba(212,168,67,0.1);
+      border: 1px solid rgba(212,168,67,0.25);
+      border-radius: 20px;
+      padding: 3px 10px;
+      transition: background 0.2s;
+    }
+
+    .discogs-link:hover { background: rgba(212,168,67,0.2); }
+
+    .price-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .price-item {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .price-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .price-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .price-loading {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .price-spinner {
+      width: 12px; height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--muted);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .error-box {
+      background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.3);
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #fca5a5;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.75rem;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="vinyl-icon">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="48" fill="#111"/>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+      <circle cx="50" cy="50" r="33" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+      <circle cx="50" cy="50" r="26" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+      <circle cx="50" cy="50" r="18" fill="#c026d3"/>
+      <circle cx="50" cy="50" r="12" fill="#1a001a"/>
+      <circle cx="50" cy="50" r="4" fill="#e879f9"/>
+    </svg>
+  </div>
+  <h1>Vinyl Recognizer</h1>
+  <p class="subtitle">Snap your record — find it on Spotify or YouTube instantly</p>
+</header>
+
+<!-- API Key -->
+<div class="card">
+  <div class="card-title">Claude API Key</div>
+  <div class="api-row">
+    <div class="api-input-wrap">
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off">
+      <button class="toggle-pw" id="togglePw" title="Show/hide key" onclick="togglePwVisibility()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <button class="btn-save" onclick="saveApiKey()">Save</button>
+  </div>
+  <div class="api-status" id="apiStatus">Enter your Anthropic API key above. It is stored locally in your browser.</div>
+</div>
+
+<!-- Image input -->
+<div class="card">
+  <div class="card-title">Album Photo</div>
+
+  <div class="drop-zone" id="dropZone"
+       onclick="document.getElementById('fileInput').click()"
+       ondragover="onDragOver(event)"
+       ondragleave="onDragLeave(event)"
+       ondrop="onDrop(event)">
+    <div class="drop-zone-inner" id="dropZoneInner">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      <p>Drop album art here or click to browse</p>
+      <span>JPG, PNG, WEBP — up to 20MB</span>
+    </div>
+  </div>
+
+  <div class="img-actions">
+    <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload Image
+    </button>
+    <button class="btn-secondary" onclick="document.getElementById('cameraInput').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Take Photo
+    </button>
+  </div>
+
+  <input type="file" id="fileInput" accept="image/*" onchange="onFileSelected(event)">
+  <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="onFileSelected(event)">
+</div>
+
+<button class="btn-primary" id="recognizeBtn" onclick="recognize()" disabled>
+  <div class="spinner"></div>
+  <span class="btn-label">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Recognize Album
+  </span>
+</button>
+
+<div id="results"></div>
+
+<footer>Powered by Claude Vision &nbsp;·&nbsp; API key stored only in your browser</footer>
+
+<script>
+  let imageBase64 = null;
+  let imageMediaType = null;
+
+  // --- API Key ---
+  function loadApiKey() {
+    const key = localStorage.getItem('claude_api_key');
+    if (key) {
+      document.getElementById('apiKey').value = key;
+      setApiStatus('ok', 'API key loaded from local storage.');
+    }
+  }
+
+  function saveApiKey() {
+    const val = document.getElementById('apiKey').value.trim();
+    if (!val) { setApiStatus('err', 'Please enter a valid API key.'); return; }
+    localStorage.setItem('claude_api_key', val);
+    setApiStatus('ok', 'API key saved successfully.');
+  }
+
+  function setApiStatus(type, msg) {
+    const el = document.getElementById('apiStatus');
+    el.textContent = msg;
+    el.className = 'api-status' + (type ? ' ' + type : '');
+  }
+
+  function togglePwVisibility() {
+    const inp = document.getElementById('apiKey');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+
+  // --- Image handling ---
+  function onFileSelected(e) {
+    const file = e.target.files[0];
+    if (file) processFile(file);
+    e.target.value = '';
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.add('drag-over');
+  }
+
+  function onDragLeave() {
+    document.getElementById('dropZone').classList.remove('drag-over');
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) processFile(file);
+  }
+
+  function processFile(file) {
+    imageMediaType = file.type || 'image/jpeg';
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imageBase64 = e.target.result.split(',')[1];
+      showPreview(e.target.result);
+      updateRecognizeBtn();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function showPreview(dataUrl) {
+    const zone = document.getElementById('dropZone');
+    document.getElementById('dropZoneInner').style.display = 'none';
+    let img = zone.querySelector('img');
+    if (!img) { img = document.createElement('img'); zone.appendChild(img); }
+    img.src = dataUrl;
+    img.style.display = 'block';
+  }
+
+  function updateRecognizeBtn() {
+    const key = document.getElementById('apiKey').value.trim() || localStorage.getItem('claude_api_key');
+    document.getElementById('recognizeBtn').disabled = !(imageBase64 && key);
+  }
+
+  document.getElementById('apiKey').addEventListener('input', updateRecognizeBtn);
+
+  // --- Recognition ---
+  async function recognize() {
+    const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('claude_api_key');
+    if (!apiKey) { showError('Please enter your Claude API key first.'); return; }
+    if (!imageBase64) { showError('Please select an image first.'); return; }
+
+    const btn = document.getElementById('recognizeBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    document.getElementById('results').innerHTML = '';
+
+    const prompt = `You are an expert in vinyl records and music history.
+
+Analyze this image of a vinyl record album cover and identify it.
+
+Respond ONLY with a JSON object (no markdown, no extra text) in this exact format:
+{
+  "found": true,
+  "title": "Album Title",
+  "artist": "Artist Name",
+  "year": "YYYY",
+  "genre": "Genre",
+  "confidence": "high|medium|low",
+  "notes": "Brief interesting note about the album (1-2 sentences)",
+  "searchQuery": "artist album title"
+}
+
+If you cannot identify the album, respond with:
+{
+  "found": false,
+  "notes": "Reason why identification failed"
+}
+
+Be as accurate as possible. The searchQuery field should be optimized for finding the album on streaming platforms.`;
+
+    try {
+      const response = await fetch('/api/recognize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey,
+          model: 'claude-sonnet-4-6',
+          max_tokens: 512,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: imageMediaType, data: imageBase64 } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `API error ${response.status}`);
+      }
+
+      const data = await response.json();
+      const raw = data.content[0].text.trim();
+
+      let result;
+      try {
+        // Strip markdown code blocks if present
+        const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        result = JSON.parse(cleaned);
+      } catch {
+        throw new Error('Could not parse response from Claude. Raw: ' + raw.slice(0, 200));
+      }
+
+      renderResult(result);
+      if (result.found) fetchDiscogsPrice(result.artist, result.title);
+
+    } catch (err) {
+      showError(err.message || 'An unexpected error occurred.');
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      updateRecognizeBtn();
+    }
+  }
+
+  function renderResult(r) {
+    const el = document.getElementById('results');
+
+    if (!r.found) {
+      el.innerHTML = `
+        <div class="error-box">
+          <strong>Album not identified.</strong><br>${r.notes || 'Could not recognize the album artwork. Try a clearer photo.'}
+        </div>`;
+      return;
+    }
+
+    const query = encodeURIComponent(r.searchQuery || `${r.artist} ${r.title}`);
+    const spotifyUrl = `https://open.spotify.com/search/${query}`;
+    const youtubeUrl  = `https://www.youtube.com/results?search_query=${query}`;
+
+    const confClass = r.confidence === 'high' ? '' : r.confidence === 'medium' ? 'medium' : 'low';
+
+    el.innerHTML = `
+      <div class="result-card">
+        <div class="album-info">
+          <div class="album-thumb-placeholder">
+            <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="46" fill="#1a001a"/>
+              <circle cx="50" cy="50" r="32" fill="none" stroke="#2e2e36" stroke-width="3"/>
+              <circle cx="50" cy="50" r="18" fill="#c026d3"/>
+              <circle cx="50" cy="50" r="8" fill="#0d0d0f"/>
+              <circle cx="50" cy="50" r="3" fill="#e879f9"/>
+            </svg>
+          </div>
+          <div class="album-meta">
+            <div class="album-title">${escHtml(r.title)}</div>
+            <div class="album-artist">${escHtml(r.artist)}</div>
+            ${r.year ? `<div class="album-year">${escHtml(r.year)}${r.genre ? ' &middot; ' + escHtml(r.genre) : ''}</div>` : ''}
+            <div class="confidence">
+              <div class="dot ${confClass}"></div>
+              ${r.confidence || 'unknown'} confidence
+            </div>
+          </div>
+        </div>
+
+        <div class="stream-links">
+          <a class="stream-btn spotify" href="${spotifyUrl}" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.208c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 1 1-.277-1.216c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.973-.519.781.781 0 0 1 .519-.972c3.632-1.102 8.147-.568 11.234 1.328a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 0 1-.583-1.782c3.533-1.155 9.404-.932 13.115 1.338a.937.937 0 0 1-.915 1.601z"/></svg>
+            Spotify
+          </a>
+          <a class="stream-btn youtube" href="${youtubeUrl}" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+            YouTube
+          </a>
+        </div>
+
+        ${r.notes ? `<div class="notes">${escHtml(r.notes)}</div>` : ''}
+        <div id="discogs-price"></div>
+      </div>`;
+  }
+
+  async function fetchDiscogsPrice(artist, title) {
+    const el = document.getElementById('discogs-price');
+    if (!el) return;
+
+    el.innerHTML = `
+      <div class="discogs-section">
+        <div class="discogs-header"><span class="discogs-label">Discogs Marketplace</span></div>
+        <div class="price-loading"><div class="price-spinner"></div>Looking up marketplace prices...</div>
+      </div>`;
+
+    try {
+      const resp = await fetch('/api/discogs-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artist, title })
+      });
+      const data = await resp.json();
+
+      if (!data.found) {
+        el.innerHTML = `
+          <div class="discogs-section">
+            <div class="discogs-header"><span class="discogs-label">Discogs Marketplace</span></div>
+            <div class="price-loading" style="color:var(--muted)">Not found on Discogs.</div>
+          </div>`;
+        return;
+      }
+
+      const fmt = v => v?.value != null ? `$${parseFloat(v.value).toFixed(2)}` : 'N/A';
+      const lowest  = fmt(data.lowest_price);
+      const highest = fmt(data.highest_price);
+      const avg     = fmt(data.avg_price);
+      const forSale = data.num_for_sale ?? 0;
+
+      el.innerHTML = `
+        <div class="discogs-section">
+          <div class="discogs-header">
+            <span class="discogs-label">Discogs Marketplace</span>
+            <a class="discogs-link" href="${data.discogs_url}" target="_blank" rel="noopener">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              View on Discogs
+            </a>
+          </div>
+          <div class="price-grid">
+            <div class="price-item">
+              <div class="price-value">${lowest}</div>
+              <div class="price-sub">Lowest</div>
+            </div>
+            <div class="price-item">
+              <div class="price-value">${avg}</div>
+              <div class="price-sub">Average</div>
+            </div>
+            <div class="price-item">
+              <div class="price-value">${highest}</div>
+              <div class="price-sub">Highest</div>
+            </div>
+            <div class="price-item">
+              <div class="price-value">${forSale}</div>
+              <div class="price-sub">For Sale</div>
+            </div>
+          </div>
+        </div>`;
+
+    } catch (_) {
+      el.innerHTML = `
+        <div class="discogs-section">
+          <div class="price-loading" style="color:var(--muted)">Could not fetch Discogs prices.</div>
+        </div>`;
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('results').innerHTML = `<div class="error-box">${escHtml(msg)}</div>`;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Init
+  loadApiKey();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: vinyl-recognizer
+    runtime: python
+    buildCommand: ""
+    startCommand: python3 vinyl-server.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
