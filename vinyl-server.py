@@ -290,6 +290,23 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass  # listings endpoint may require auth; silently skip
 
+        # 4. Fetch community stats (have/want/rating)
+        community = {}
+        try:
+            rel_url = f"https://api.discogs.com/releases/{release_id}"
+            req4 = urllib.request.Request(rel_url, headers={"User-Agent": ua})
+            with urllib.request.urlopen(req4, timeout=8) as resp:
+                rel_data = json.loads(resp.read())
+            c = rel_data.get("community", {})
+            community = {
+                "have": c.get("have", 0),
+                "want": c.get("want", 0),
+                "rating_avg": round(c.get("rating", {}).get("average", 0), 2),
+                "rating_count": c.get("rating", {}).get("count", 0),
+            }
+        except Exception:
+            pass
+
         label_list = release.get("label", [])
         format_list = release.get("format", [])
         self._json_response({
@@ -305,6 +322,7 @@ class Handler(BaseHTTPRequestHandler):
             "highest_price": highest_price,
             "median_price": median_price,
             "num_for_sale": stats.get("num_for_sale", 0),
+            "community": community,
             "discogs_url": discogs_url,
         })
 

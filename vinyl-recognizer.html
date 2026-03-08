@@ -413,31 +413,52 @@
 
     .discogs-link:hover { background: rgba(212,168,67,0.2); }
 
-    .price-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    /* Community stats */
+    .community-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+      flex-wrap: wrap;
     }
 
-    .price-item {
-      flex: 1;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      text-align: center;
-    }
+    .cs-block { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
+    .cs-num { font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .cs-lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .cs-divider { width: 1px; height: 28px; background: var(--border); }
+    .cs-rating-stars { color: #d4a843; font-size: 0.95rem; line-height: 1; letter-spacing: 1px; }
+    .cs-rating-sub { font-size: 0.68rem; color: var(--muted); margin-top: 2px; text-align: center; }
 
-    .price-value {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--text);
-    }
-
-    .price-sub {
-      font-size: 0.7rem;
+    /* Sales range */
+    .sr-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
       color: var(--muted);
-      margin-top: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .sr-row { display: flex; align-items: flex-end; }
+
+    .sr-col { display: flex; flex-direction: column; }
+    .sr-col.center { align-items: center; }
+    .sr-col.right  { align-items: flex-end; }
+
+    .sr-label { font-size: 0.68rem; color: var(--muted); margin-bottom: 3px; }
+    .sr-val { font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+    .sr-curr { font-size: 0.65rem; color: var(--muted); margin-top: 1px; }
+
+    .sr-line {
+      flex: 1;
+      height: 3px;
+      background: #6b7c3a;
+      border-radius: 2px;
+      margin: 0 3px 6px;
     }
 
     .price-loading {
@@ -1380,41 +1401,84 @@ Be as accurate as possible. The searchQuery field should be optimized for findin
         }
       }
 
-      const fmt = v => v?.value != null ? `$${parseFloat(v.value).toFixed(2)}` : 'N/A';
+      const curr = data.lowest_price?.currency || data.median_price?.currency || 'USD';
+      const fmt = v => v?.value != null ? `${parseFloat(v.value).toFixed(2)}` : 'N/A';
       const lowest  = fmt(data.lowest_price);
       const highest = fmt(data.highest_price);
       const median  = fmt(data.median_price);
       const forSale = data.num_for_sale ?? 0;
 
+      const c = data.community || {};
+      const have = c.have ?? '–';
+      const want = c.want ?? '–';
+      const ratingAvg = c.rating_avg ?? 0;
+      const ratingCount = c.rating_count ?? 0;
+
+      const stars = (() => {
+        let s = '';
+        for (let i = 1; i <= 5; i++) {
+          s += ratingAvg >= i - 0.25 ? '★' : ratingAvg >= i - 0.75 ? '½' : '☆';
+        }
+        return s;
+      })();
+
       const catnoBadge = data.catno
-        ? `<span style="font-size:0.75rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;margin-left:6px">${escHtml(data.catno)}</span>`
+        ? ` <span style="font-size:0.72rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 7px">${escHtml(data.catno)}</span>`
         : '';
 
       el.innerHTML = `
         <div class="discogs-section">
           <div class="discogs-header">
-            <span class="discogs-label">Discogs Marketplace${catnoBadge}</span>
+            <span class="discogs-label">Discogs${catnoBadge}</span>
             <a class="discogs-link" href="${data.discogs_url}" target="_blank" rel="noopener">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
               View on Discogs
             </a>
           </div>
-          <div class="price-grid">
-            <div class="price-item">
-              <div class="price-value">${lowest}</div>
-              <div class="price-sub">Low</div>
+
+          <div class="community-stats">
+            <div class="cs-block">
+              <div class="cs-num">${have}</div>
+              <div class="cs-lbl">have</div>
             </div>
-            <div class="price-item">
-              <div class="price-value">${median}</div>
-              <div class="price-sub">Median</div>
+            <div class="cs-divider"></div>
+            <div class="cs-block">
+              <div class="cs-num">${want}</div>
+              <div class="cs-lbl">want</div>
             </div>
-            <div class="price-item">
-              <div class="price-value">${highest}</div>
-              <div class="price-sub">High</div>
+            ${ratingCount > 0 ? `
+            <div class="cs-divider"></div>
+            <div class="cs-block">
+              <div class="cs-rating-stars">${stars}</div>
+              <div class="cs-rating-sub">${ratingAvg} &middot; ${ratingCount} rating${ratingCount !== 1 ? 's' : ''}</div>
+            </div>` : ''}
+            <div class="cs-divider"></div>
+            <div class="cs-block">
+              <div class="cs-num">${forSale}</div>
+              <div class="cs-lbl">for sale</div>
             </div>
-            <div class="price-item">
-              <div class="price-value">${forSale}</div>
-              <div class="price-sub">For Sale</div>
+          </div>
+
+          <div class="sr-header">
+            <span>Sales range</span>
+          </div>
+          <div class="sr-row">
+            <div class="sr-col">
+              <div class="sr-label">Low</div>
+              <div class="sr-val">${lowest}</div>
+              <div class="sr-curr">${curr}</div>
+            </div>
+            <div class="sr-line"></div>
+            <div class="sr-col center">
+              <div class="sr-label">Median</div>
+              <div class="sr-val">${median}</div>
+              <div class="sr-curr">${curr}</div>
+            </div>
+            <div class="sr-line"></div>
+            <div class="sr-col right">
+              <div class="sr-label">High</div>
+              <div class="sr-val">${highest}</div>
+              <div class="sr-curr">${curr}</div>
             </div>
           </div>
         </div>`;
